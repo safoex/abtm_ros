@@ -1,0 +1,35 @@
+common:
+  root_child: main
+  parameters:
+    online: 1
+
+variables:
+  input: ["kek"]
+  output: ["count"]
+
+set:
+  count: 0
+  kek: 0
+
+nodes:
+  global:
+    main:
+      type: sequence
+      children: [a, b, c]
+
+    a:
+      type: condition
+      S: kek > 0
+      R: default
+
+    b:
+      type: action
+      assign:
+        count: count + kek
+
+    c:
+      type: action
+      assign:
+        kek: 0
+
+
