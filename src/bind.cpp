@@ -36,6 +36,7 @@ int main(int argc, char **argv)
     system("dot -Tpdf dot.txt > tree.pdf");
 
     rb.send_output(t.start());
+    t.get_memory().var["time"] = ros::Time::now().toSec();
     std::ofstream("states.txt") << t.dot_tree_description(true);
 
 
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
         std::string dot_description;
         while (ros::ok()) {
             sleep_small.sleep();
+            rb.process({{"time",ros::Time::now().toSec()}});
             ros::spinOnce();
 
             std::string new_desc = t.dot_tree_description(true);
@@ -56,6 +58,8 @@ int main(int argc, char **argv)
     }
     else {
         std::ofstream(rb.tests_output) << tp.apply_samples(rb.tests_input);
+        std::ofstream("states.txt") << t.dot_tree_description(true);
+        system("dot -Tpdf states.txt > states.pdf");
     }
     return 0;
 }

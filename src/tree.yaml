@@ -2,34 +2,560 @@ common:
   root_child: main
   parameters:
     online: 1
+  input: "input.yaml"
+  output: "output.yaml"
+
+ROSbind:
+  publishers:
+    nav_goal:
+      type: geometry_msgs/Point
+      var:
+        x: nav_x
+        y: nav_y
+        z: nav_z
+
+    nav_goals:
+      type: std_msgs/Float64MultiArray
+      vars: ["nav_x_1", "nav_y_1", "nav_x_2", "nav_y_2", "nav_x_3", "nav_y_3",
+             "nav_x_4", "nav_y_4", "nav_x_5", "nav_y_5", "nav_x_6", "nav_y_6"]
+
+    borders:
+      type: std_msgs/Float64MultiArray
+      vars: ["b_x", "b_y", "b_z"]
+
+    velocity:
+      type: std_msgs/Float32
+      var: velocity
+
+    emergency_status:
+      type: std_msgs/UInt8
+      var: emergency_status
+
+  subscribers:
+    position:
+      type: geometry_msgs/Point
+      var:
+        x: x
+        y: y
+        z: z
+
+    nav_mode:
+      type: std_msgs/UInt8
+      var: command
+
+    connection:
+      type: std_msgs/UInt8
+      var: connection_lost
+
 
 variables:
-  input: ["kek"]
-  output: ["count"]
+  input: ["kek", "x", "y", "z", "nav", "home", "command", "home_x", "home_y", "home_z",
+          "tolerance", "nav_i", "time", "connection_lost", "con_time_wait"]
+  output: ["count", "nav_x", "nav_y", "nav_z", "b_x", "b_y", "b_z","mode", "velocity",
+           "nav_x_1", "nav_y_1", "nav_x_2", "nav_y_2", "nav_x_3", "nav_y_3", "con_home_fired", "con_set_timer",
+           "nav_x_4", "nav_y_4", "nav_x_5", "nav_y_5", "emergency_status", "bnd_home_fired"]
 
 set:
   count: 0
   kek: 0
+  x: 0
+  y: 0
+  z: 0
+  nav: 1
+  home: 2
+  command: 2
+  b_x: 1.5
+  b_y: 1.5
+  b_z: 1.5
+  home_x: 0
+  home_y: 0
+  home_z: 0
+  tolerance: 0.1
+  mode: 2
+  connection_lost: 0
+  con_time_wait: 1
+  bnd_time_wait: 1
+  start_timer_wait: 5
 
 nodes:
   global:
     main:
-      type: sequence
-      children: [a, b, c]
+      type: parallel
+      children: [delay_start, select, home, nav, connection, boundary]
 
-    a:
+    delay_start:
+      type: sequence
+      children: [start_sel, start_wait, start_act, start_sleep]
+      hide: 1
+
+    start_sel:
+      type: selector
+      children: [start_if_timer, start_set_timer]
+
+    start_if_timer:
       type: condition
-      S: kek > 0
+      S: start_timer_set
+      F: default
+
+    start_set_timer:
+      type: action
+      assign:
+        start_timer_set: 1
+        start_timer: time
+
+    start_wait:
+      type: condition
+      S: time - start_timer > start_timer_wait
       R: default
 
-    b:
+    start_act:
       type: action
       assign:
-        count: count + kek
+        command: home
 
-    c:
+    start_sleep:
+      type: condition
+      R: default
+
+    select:
+      type: parallel
+      children: [go_home, go_nav]
+      hide: 1
+
+    go_home:
+      type: sequence
+      children: [if_home, set_home]
+
+    if_home:
+      type: condition
+      S: mode = nav &  command = home
+      R: default
+
+    set_home:
       type: action
       assign:
-        kek: 0
+        mode: home
+
+    go_nav:
+      type: sequence
+      children: [if_nav, set_nav]
+
+    if_nav:
+      type: condition
+      S: mode = home & command = nav
+      R: default
+
+    set_nav:
+      type: action
+      assign:
+        mode: nav
+        command: 0
+        nav1_latch_var: 0
+        nav2_latch_var: 0
+        nav3_latch_var: 0
+        nav_x_1: 1
+        nav_y_1: 0 - 1
+        nav_x_2: 0.8
+        nav_y_2: 0.8
+        nav_x_3: 0 - 1
+        nav_y_3: 1
+        nav_x_4: 0 - 2
+        nav_y_4: 0
+        nav_x_5: 0 - 1
+        nav_y_5: 0 - 1
+        nav_x_6: 0
+        nav_y_6: 0
+
+    home:
+      type: sequence
+      children: [iff_home, home_seq]
+      hide: 0
+
+    iff_home:
+      type: condition
+      S: mode = home
+      R: default
+
+    home_seq:
+      type: sequence
+      children: [home_goal, home_wait]
+
+    home_goal:
+      type: action
+      assign:
+        nav_x: home_x
+        nav_y: home_y
+        nav_z: home_z
+
+    home_wait:
+      type: condition
+      R: default
+
+    nav:
+      type: sequence
+      children: [iff_nav, nav_sequence, nav_end]
+
+    iff_nav:
+      type: condition
+      S: mode = nav
+      R: default
+
+    nav_sequence:
+      type: sequence
+      children: ["nav1_sel", "nav2_sel", "nav3_sel", "nav4_sel", "nav5_sel", "nav6_sel"]
+
+    nav1_sel:
+      type: selector
+      children: ["nav1_done", "nav1"]
+      hide: 0
+
+    nav1_done:
+      type: condition
+      S: nav_i > 0
+      F: default
+
+    nav2_sel:
+      type: selector
+      children: ["nav2_done", "nav2"]
+      hide: 0
+
+    nav2_done:
+      type: condition
+      S: nav_i > 1
+      F: default
+
+    nav3_sel:
+      type: selector
+      children: ["nav3_done", "nav3"]
+      hide: 0
+
+    nav3_done:
+      type: condition
+      S: nav_i > 2
+      F: default
+
+    nav4_sel:
+      type: selector
+      children: ["nav4_done", "nav4"]
+      hide: 1
+
+    nav4_done:
+      type: condition
+      S: nav_i > 3
+      F: default
+
+    nav5_sel:
+      type: selector
+      children: ["nav5_done", "nav5"]
+      hide: 1
+
+    nav5_done:
+      type: condition
+      S: nav_i > 4
+      F: default
+
+    nav6_sel:
+      type: selector
+      children: ["nav6_done", "nav6"]
+      hide: 1
+
+    nav6_done:
+      type: condition
+      S: nav_i > 5
+      F: default
+
+    nav_end:
+      type: action
+      assign:
+        mode: home
+        nav_i: 0
+
+    nav1:
+      type: sequence
+      children: ["nav1_act", "nav1_end", "nav1_next"]
+      hide: 0
+
+    nav1_act:
+      type: action
+      assign:
+        nav_x: nav_x_1
+        nav_y: nav_y_1
+
+    nav1_end:
+      type: condition
+      S: x - nav_x < tolerance & nav_x - x < tolerance & y - nav_y < tolerance & nav_y - y < tolerance
+      R: default
+
+    nav1_next:
+      type: action
+      assign:
+        nav_i: nav_i + 1
+
+    nav2:
+      type: sequence
+      children: ["nav2_act", "nav2_end", "nav2_next"]
+      hide: 0
+
+    nav2_act:
+      type: action
+      assign:
+        nav_x: nav_x_2
+        nav_y: nav_y_2
+
+    nav2_end:
+      type: condition
+      S: x - nav_x < tolerance & nav_x - x < tolerance & y - nav_y < tolerance & nav_y - y < tolerance
+      R: default
+
+    nav2_next:
+      type: action
+      assign:
+        nav_i: nav_i + 1
+
+    nav3:
+      type: sequence
+      children: ["nav3_act", "nav3_end", "nav3_next"]
+      hide: 0
+
+    nav3_act:
+      type: action
+      assign:
+        nav_x: nav_x_3
+        nav_y: nav_y_3
+
+    nav3_end:
+      type: condition
+      S: x - nav_x < tolerance & nav_x - x < tolerance & y - nav_y < tolerance & nav_y - y < tolerance
+      R: default
+
+    nav3_next:
+      type: action
+      assign:
+        nav_i: nav_i + 1
+
+
+    nav4:
+      type: sequence
+      children: [nav4_act, nav4_end, nav4_next]
+      hide: 0
+
+    nav4_act:
+      type: action
+      assign:
+        nav_x: nav_x_4
+        nav_y: nav_y_4
+
+    nav4_end:
+      type: condition
+      S: x - nav_x < tolerance & nav_x - x < tolerance & y - nav_y < tolerance & nav_y - y < tolerance
+      R: default
+
+    nav4_next:
+      type: action
+      assign:
+        nav_i: nav_i + 1
+
+    nav5:
+      type: sequence
+      children: [nav5_act, nav5_end, nav5_next]
+      hide: 0
+
+    nav5_act:
+      type: action
+      assign:
+        nav_x: nav_x_5
+        nav_y: nav_y_5
+
+    nav5_end:
+      type: condition
+      S: x - nav_x < tolerance & nav_x - x < tolerance & y - nav_y < tolerance & nav_y - y < tolerance
+      R: default
+
+    nav5_next:
+      type: action
+      assign:
+        nav_i: nav_i + 1
+
+    nav6:
+      type: sequence
+      children: [nav6_act, nav6_end, nav6_next]
+      hide: 0
+
+    nav6_act:
+      type: action
+      assign:
+        nav_x: nav_x_6
+        nav_y: nav_y_6
+
+    nav6_end:
+      type: condition
+      S: x - nav_x < tolerance & nav_x - x < tolerance & y - nav_y < tolerance & nav_y - y < tolerance
+      R: default
+
+    nav6_next:
+      type: action
+      assign:
+        nav_i: nav_i + 1
+
+
+
+  connection_scope:
+    connection:
+      type: sequence
+      children: [con_lost_enter, con_set_timer, con_connection_returned, con_timer_fired, con_go_to_home, con_sleep]
+      hide: 1
+
+    con_lost_enter:
+      type: condition
+      S: connection_lost | con_set_timer | con_home_fired
+      R: default
+
+    con_set_timer:
+      type: selector
+      children: [if_con_set_timer, con_set_timer_act]
+
+    if_con_set_timer:
+      type: condition
+      S: con_set_timer = 1
+      F: default
+
+    con_set_timer_act:
+      type: action
+      assign:
+        con_timer: time
+        con_set_timer: 1
+
+    con_connection_returned:
+      type: selector
+      children: [if_con_back, con_reset_state]
+
+    if_con_back:
+      type: condition
+      S: connection_lost = 1
+      F: default
+
+    con_reset_state:
+      type: sequence
+      children: [con_home_unfire, con_reset_state_act]
+
+    con_home_unfire:
+      type: selector
+      children: [if_con_home_fired, con_reset_mode]
+
+    if_con_home_fired:
+      type: condition
+      S: con_home_fired = 0
+      F: default
+
+    con_reset_mode:
+      type: action
+      assign:
+        con_home_fired: 0
+        emergency_status: con_home_fired | bnd_home_fired
+        command: con_saved_mode
+
+    con_reset_state_act:
+      type: action
+      assign:
+        con_set_timer: 0
+
+    con_timer_fired:
+      type: condition
+      S: time - con_timer > con_time_wait & con_set_timer
+      R: default
+
+    con_go_to_home:
+      type: action
+      assign:
+        con_saved_mode: mode
+        mode: home
+        command: home
+        con_home_fired: 1
+        emergency_status: con_home_fired | bnd_home_fired
+
+    con_sleep:
+      type: condition
+      S: connection_lost = 0
+      R: default
+
+  boundary_scope:
+    boundary:
+      type: sequence
+      children: [bnd_lost_enter, bnd_set_timer, bnd_connection_returned, bnd_timer_fired, bnd_go_to_home, bnd_sleep]
+      hide: 0
+
+    bnd_lost_enter:
+      type: condition
+      S:  (x > b_x | x < 0 - b_x | y > b_y | y < 0 - b_y) | bnd_set_timer | bnd_home_fired
+      R: default
+
+    bnd_set_timer:
+      type: selector
+      children: [if_bnd_set_timer, bnd_set_timer_act]
+
+    if_bnd_set_timer:
+      type: condition
+      S: bnd_set_timer = 1
+      F: default
+
+    bnd_set_timer_act:
+      type: action
+      assign:
+        bnd_timer: time
+        bnd_set_timer: 1
+
+    bnd_connection_returned:
+      type: selector
+      children: [if_bnd_back, bnd_reset_state]
+
+    if_bnd_back:
+      type: condition
+      S: (x > b_x | x < 0 - b_x | y > b_y | y < 0 - b_y)
+      F: default
+
+    bnd_reset_state:
+      type: sequence
+      children: [bnd_home_unfire, bnd_reset_state_act]
+
+    bnd_home_unfire:
+      type: selector
+      children: [if_bnd_home_fired, bnd_reset_mode]
+
+    if_bnd_home_fired:
+      type: condition
+      S: bnd_home_fired = 0
+      F: default
+
+    bnd_reset_mode:
+      type: action
+      assign:
+        bnd_home_fired: 0
+        emergency_status: con_home_fired | bnd_home_fired
+        command: bnd_saved_mode
+
+    bnd_reset_state_act:
+      type: action
+      assign:
+        bnd_set_timer: 0
+
+    bnd_timer_fired:
+      type: condition
+      S: time - bnd_timer > bnd_time_wait & bnd_set_timer
+      R: default
+
+    bnd_go_to_home:
+      type: action
+      assign:
+        bnd_saved_mode: mode
+        vcommand: home
+        bnd_home_fired: 1
+        nav_i: nav_i + 1
+        emergency_status: con_home_fired | bnd_home_fired
+
+    bnd_sleep:
+      type: condition
+      S: 1 - (x > b_x | x < 0 - b_x | y > b_y | y < 0 - b_y)
+      R: default
+
 
 

@@ -66,7 +66,7 @@ namespace bt {
 
         static std::vector<std::string> get_array_var(YAML::Node const& node) {
             std::vector<std::string> vars;
-            if(node["var"]) {
+            if(node["vars"]) {
                 for(auto v: node["vars"]) {
                     vars.push_back(v.as<std::string>());
                 }
@@ -92,7 +92,7 @@ namespace bt {
             ROSbind::sample const& out, YAML::Node const& node) {
             auto used_variables = ROSPacker::get_array_var(node);
             for(int i = 0; i < used_variables.size(); i++)
-                msg.data[i] = out.at(used_variables[i]);
+                msg.data.push_back(out.at(used_variables[i]));
     }, ROSPacker::get_array_var);}
 
     template <class T> ROSbind::MakeSubscriberFunction ROSPacker<T>::single_sub() {
@@ -111,57 +111,6 @@ namespace bt {
 
 
 
-//    template<class T> ROSbind::MakePublisherFunction unpacker_envelop(std::function<void(T&,
-//            ROSbind::sample const&, std::vector<std::string> const&)> convert) {
-//        return [convert](ROSbind& b, std::vector<std::string> const& used_variables,
-//                  std::string const& pub_name, unsigned queue_size) -> ROSbind::PublisherFunction<T> {
-//            bt::ROSbind::PublisherFunction<T> f = [&b, used_variables, convert](ROSbind::sample const& out) -> T {
-//                T msg;
-//                convert(msg, out, used_variables);
-//                return msg;
-//            };
-//            b.add_publisher(f, {used_variables.begin(), used_variables.end()}, pub_name, queue_size);
-//        };
-//    }
-//
-//
-//    template<class T> auto single_pub = unpacker_envelop<T>([](T& msg,
-//            ROSbind::sample const& out, std::vector<std::string> const& used_variables) {
-//        msg.data = out.at(used_variables[0]);
-//    });
-//
-//    template<class T> auto array_pub = unpacker_envelop<T>([](T& msg,
-//            ROSbind::sample const& out, std::vector<std::string> const& used_variables) {
-//        for(int i = 0; i < used_variables.size(); i++)
-//            msg.data[i] = out.at(used_variables[i]);
-//    });
-//
-//    template<class T> ROSbind::MakeSubscriberFunction packer_envelop(std::function<void(T const&,
-//            ROSbind::sample&, std::vector<std::string> const&)> convert) {
-//        return [convert](ROSbind& b, std::vector<std::string> const& used_variables,
-//                         std::string const& pub_name, unsigned queue_size) -> ROSbind::SubscriberFunction<T> {
-//            std::cout << "OKAY I'M HERE " << pub_name << std::endl;
-//            bt::ROSbind::SubscriberFunction<T> f = [&b, used_variables, convert](T const& msg) -> ROSbind::sample {
-//                ROSbind::sample in;
-//                convert(msg, in, used_variables);
-//                return in;
-//            };
-//            b.add_subscriber(f, pub_name, queue_size);
-//        };
-//    }
-//
-//    template<class T> auto single_sub = packer_envelop<T>([](T const& msg,
-//            ROSbind::sample &in, std::vector<std::string> const& used_variables) {
-//        in[used_variables[0]] = msg.data;
-//    });
-//
-//    template<class T> auto array_sub = packer_envelop<T>([](T const& msg,
-//            ROSbind::sample &in, std::vector<std::string> const& used_variables) {
-//        for(int i = 0; i < used_variables.size(); i++)
-//            in[used_variables[i]] = msg.data[i];
-//    });
-//
-
 
     ROSbind::ROSbind(ros::NodeHandle &n, Tree &tree, const std::string &yaml_settings) : n(n), tree(tree) {
 
@@ -171,7 +120,7 @@ namespace bt {
         make_publisher["std_msgs/Float64"] = ROSPacker<std_msgs::Float64>::single_pub();
 
         make_publisher["std_msgs/Float32MultiArray"] = ROSPacker<std_msgs::Float32MultiArray>::array_pub();
-        make_publisher["std_msgs/Float32MultiArray"] = ROSPacker<std_msgs::Float64MultiArray>::array_pub();
+        make_publisher["std_msgs/Float64MultiArray"] = ROSPacker<std_msgs::Float64MultiArray>::array_pub();
 
         make_publisher["geometry_msgs/Point"] = ROSPacker<geometry_msgs::Point>::unpacker_envelop([](geometry_msgs::Point& msg,
                 ROSbind::sample const& out, YAML::Node const& node) {
